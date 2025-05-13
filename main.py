@@ -5,7 +5,6 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
-import pickle
 
 app = FastAPI()
 
@@ -21,15 +20,22 @@ async def health_check():
 model = load_model('best_model.h5')
 
 # Load the TF-IDF vocabulary
-with open('tfidf_vocabulary.npy', 'rb') as f:
-    tfidf_vocab = pickle.load(f)
-tfidf_vectorizer = TfidfVectorizer(vocabulary=tfidf_vocab)
+try:
+    tfidf_vocab = np.load('tfidf_vocabulary.npy', allow_pickle=True)
+    print("File loaded successfully:", tfidf_vocab)
+    tfidf_vectorizer = TfidfVectorizer(vocabulary=tfidf_vocab)
+except Exception as e:
+    print("Error loading file:", e)
+    tfidf_vectorizer = TfidfVectorizer()  # Initialize without vocabulary if loading fails
 
 # Load the label encoder classes
-with open('label_encoder_classes.npy', 'rb') as f:
-    label_encoder_classes = pickle.load(f)
-label_encoder = LabelEncoder()
-label_encoder.classes_ = label_encoder_classes
+try:
+    label_encoder_classes = np.load('label_encoder_classes.npy', allow_pickle=True)
+    label_encoder = LabelEncoder()
+    label_encoder.classes_ = label_encoder_classes
+except Exception as e:
+    print("Error loading label encoder classes:", e)
+    label_encoder = LabelEncoder()  # Initialize without classes if loading fails
 
 class InputData(BaseModel):
     file_path: str
@@ -62,4 +68,3 @@ async def predict(input_data: InputData):
     y_pred_labels = label_encoder.inverse_transform(y_pred_classes)
 
     return {"predictions": y_pred_labels.tolist()}
-
