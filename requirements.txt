@@ -1,0 +1,11 @@
+fastapi==0.115.12
+uvicorn==0.34.2
+pandas==2.2.3
+scikit-learn==1.6.1
+tensorflow==2.16.2
+keras==3.9.2
+keras-tuner==1.4.7
+numpy==1.26.4
+python-dateutil==2.9.0.post0
+pytz==2025.2
+requests==2.32.3
