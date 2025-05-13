@@ -9,6 +9,14 @@ import pickle
 
 app = FastAPI()
 
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 # Load the pre-trained model
 model = load_model('best_model.h5')
 
