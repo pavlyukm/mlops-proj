@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from load_data.load_data import load_and_preprocess_data
 from process_data.process_data import evaluate_model
 from model.model import train_model
+import pickle
 import logging
 
 # Configure logging
@@ -38,13 +39,13 @@ async def health_check():
 # Load the pre-trained model
 model = load_model('best_model.h5')
 
-# Load the TF-IDF vocabulary
+# Load the TF-IDF vectorizer
 try:
-    tfidf_vocab = np.load('tfidf_vocabulary.npy', allow_pickle=True)
-    logger.info("File loaded successfully: %s", tfidf_vocab)
-    tfidf_vectorizer = TfidfVectorizer(vocabulary=tfidf_vocab)
+    with open('tfidf_vectorizer.pkl', 'rb') as f:
+        tfidf_vectorizer = pickle.load(f)
+    logger.info("TF-IDF vectorizer loaded successfully")
 except Exception as e:
-    logger.error("Error loading file: %s", e)
+    logger.error("Error loading TF-IDF vectorizer: %s", e)
     tfidf_vectorizer = TfidfVectorizer()  # Initialize without vocabulary if loading fails
 
 # Load the label encoder classes
@@ -52,6 +53,7 @@ try:
     label_encoder_classes = np.load('label_encoder_classes.npy', allow_pickle=True)
     label_encoder = LabelEncoder()
     label_encoder.classes_ = label_encoder_classes
+    logger.info("Label encoder classes: %s", label_encoder.classes_)
 except Exception as e:
     logger.error("Error loading label encoder classes: %s", e)
     label_encoder = LabelEncoder()  # Initialize without classes if loading fails
@@ -109,6 +111,25 @@ async def predict(input_data: PredictionInput):
             'Combined Text': input_data.combined_text
         }])
 
+        logger.info("DataFrame before transformation: %s", df)
+        logger.info("Data types: %s", df.dtypes)
+
+        # Encode categorical features
+        try:
+            df['Product Purchased'] = label_encoder.transform([df['Product Purchased'][0]])[0]
+        except ValueError as ve:
+            logger.error("Error encoding 'Product Purchased': %s", str(ve))
+            return {"error": f"Unseen label in 'Product Purchased': {df['Product Purchased'][0]}"}
+
+        try:
+            df['Ticket Priority'] = label_encoder.transform([df['Ticket Priority'][0]])[0]
+        except ValueError as ve:
+            logger.error("Error encoding 'Ticket Priority': %s", str(ve))
+            return {"error": f"Unseen label in 'Ticket Priority': {df['Ticket Priority'][0]}"}
+
+        logger.info("DataFrame after encoding: %s", df)
+        logger.info("Data types after encoding: %s", df.dtypes)
+
         # Vectorize text features
         X_text = tfidf_vectorizer.transform(df['Combined Text'] + " " + df['Ticket Subject'])
 
@@ -119,6 +140,9 @@ async def predict(input_data: PredictionInput):
         ], axis=1)
 
         X.columns = X.columns.astype(str)
+
+        logger.info("DataFrame after transformation: %s", X)
+        logger.info("Data types after transformation: %s", X.dtypes)
 
         # Make predictions
         y_pred = model.predict(X)

@@ -3,6 +3,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
+import pickle
 import logging
 
 # Configure logging
@@ -25,6 +26,10 @@ def load_and_preprocess_data(file_path):
         # Vectorize text features
         tfidf_vectorizer = TfidfVectorizer()
         X_text = tfidf_vectorizer.fit_transform(df['Combined Text'] + " " + df['Ticket Subject'])
+
+        # Save the fitted vectorizer
+        with open('tfidf_vectorizer.pkl', 'wb') as f:
+            pickle.dump(tfidf_vectorizer, f)
 
         # Combine features
         X = pd.concat([
