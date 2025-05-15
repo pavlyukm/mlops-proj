@@ -1,40 +1,43 @@
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
+import logging
 
-def train_model(X_train, y_train, X_test, y_test, input_shape, num_classes):
-    def build_model(hp):
-        model = Sequential()
-        model.add(Dense(units=hp.Int('units_1', min_value=32, max_value=512, step=32),
-                        activation='relu', input_shape=(input_shape,)))
-        model.add(Dropout(rate=hp.Float('dropout_1', min_value=0.1, max_value=0.5, step=0.1)))
-        model.add(Dense(units=hp.Int('units_2', min_value=32, max_value=256, step=32), activation='relu'))
-        model.add(Dropout(rate=hp.Float('dropout_2', min_value=0.1, max_value=0.5, step=0.1)))
-        model.add(Dense(num_classes, activation='softmax'))
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-        model.compile(optimizer=Adam(hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4])),
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
-        return model
+# Enable eager execution
+tf.config.run_functions_eagerly(True)
 
-    model = build_model(hp=None)  # You need to define hp or adjust accordingly
+def train_model(model_path, X_train, y_train, X_test, y_test):
+    try:
+        logger.info("Loading existing model")
+        model = load_model(model_path)
 
-    # Train the model
-    model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1)
+        # Recompile the model to ensure optimizer compatibility
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Evaluate the model
-    y_pred = model.predict(X_test)
-    y_pred_classes = np.argmax(y_pred, axis=1)
-    y_test_classes = np.argmax(y_test, axis=1)
+        logger.info("Training model with new data")
+        # Train the model with new data
+        model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1)
 
-    accuracy = accuracy_score(y_test_classes, y_pred_classes)
-    report = classification_report(y_test_classes, y_pred_classes)
+        logger.info("Evaluating model")
+        # Evaluate the model
+        y_pred = model.predict(X_test)
+        y_pred_classes = np.argmax(y_pred, axis=1)
+        y_test_classes = np.argmax(y_test, axis=1)
 
-    print(f"Accuracy: {accuracy}")
-    print("Classification Report:")
-    print(report)
+        accuracy = accuracy_score(y_test_classes, y_pred_classes)
+        report = classification_report(y_test_classes, y_pred_classes)
 
-    return model, accuracy, report
+        logger.info(f"Accuracy: {accuracy}")
+        logger.info("Classification Report:")
+        logger.info(report)
+
+        return model, accuracy, report
+    except Exception as e:
+        logger.error("Error in train_model: %s", str(e))
+        raise
