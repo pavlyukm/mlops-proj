@@ -2,15 +2,26 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
+import os
+import boto3
+from io import BytesIO
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": """
+    Welcome to my crappy ML app :)
+
+    Visit /docs for Swagger UI documentation.
+    """}
 
 @app.get("/health")
 async def health_check():
@@ -37,17 +48,48 @@ except Exception as e:
     print("Error loading label encoder classes:", e)
     label_encoder = LabelEncoder()  # Initialize without classes if loading fails
 
-class InputData(BaseModel):
-    file_path: str
+# Load environment variables for AWS
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+
+# Initialize S3 client
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name=AWS_REGION)
+
+@app.post("/train")
+async def train():
+    bucket_name = 'pavliukmmlops'
+    file_key = 'train-00000-of-00001.parquet'
+
+    # Download the file from S3
+    response = s3.get_object(Bucket=bucket_name, Key=file_key)
+    data = response['Body'].read()
+
+    # Load the data into a DataFrame
+    df = pd.read_parquet(BytesIO(data))
+
+    # Preprocess and train the model (use your existing preprocessing and training code here)
+    # ...
+
+    return {"message": "Training completed successfully"}
+
+class PredictionInput(BaseModel):
+    customer_email: str
+    product_purchased: str
+    ticket_subject: str
+    ticket_priority: str
+    combined_text: str
 
 @app.post("/predict")
-async def predict(input_data: InputData):
-    file_path = input_data.file_path
-
-    # Load and preprocess the input data
-    df = pd.read_parquet(file_path)
-    df['Product Purchased'] = label_encoder.transform(df['Product Purchased'])
-    df['Ticket Priority'] = label_encoder.transform(df['Ticket Priority'])
+async def predict(input_data: PredictionInput):
+    # Preprocess the input data
+    df = pd.DataFrame([{
+        'Customer Email': input_data.customer_email,
+        'Product Purchased': input_data.product_purchased,
+        'Ticket Subject': input_data.ticket_subject,
+        'Ticket Priority': input_data.ticket_priority,
+        'Combined Text': input_data.combined_text
+    }])
 
     # Vectorize text features
     X_text = tfidf_vectorizer.transform(df['Combined Text'] + " " + df['Ticket Subject'])
