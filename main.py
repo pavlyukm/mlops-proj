@@ -9,6 +9,9 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from dotenv import load_dotenv
+from load_data.load_data import load_and_preprocess_data
+from process_data.process_data import evaluate_model
+from model.model import train_model
 
 # Load environment variables from .env file
 load_dotenv()
@@ -65,13 +68,13 @@ async def train():
     response = s3.get_object(Bucket=bucket_name, Key=file_key)
     data = response['Body'].read()
 
-    # Load the data into a DataFrame
-    df = pd.read_parquet(BytesIO(data))
+    # Load and preprocess the data
+    X_train, X_test, y_train, y_test, tfidf_vectorizer, label_encoder = load_and_preprocess_data(BytesIO(data))
 
-    # Preprocess and train the model (use your existing preprocessing and training code here)
-    # ...
+    # Train the model
+    model, accuracy, report = train_model(X_train, y_train, X_test, y_test, X_train.shape[1], y_train.shape[1])
 
-    return {"message": "Training completed successfully"}
+    return {"message": "Training completed successfully", "accuracy": accuracy, "report": report}
 
 class PredictionInput(BaseModel):
     customer_email: str
