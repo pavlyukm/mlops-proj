@@ -84,7 +84,7 @@ async def train(request: Request):
     logger.info("Received request at /train endpoint")
     try:
         bucket_name = 'pavliukmmlops'
-        file_key = 'train-00000-of-00001.parquet'
+        file_key = 'train-00000-of-00001.parquet' # Need to change this for new parquet files
 
         logger.info("Downloading file from S3")
         response = s3.get_object(Bucket=bucket_name, Key=file_key)
