@@ -27,9 +27,7 @@ app = FastAPI()
 @app.get("/")
 async def root():
     return {"message": """
-    Welcome to my crappy ML app :)
-
-    Visit /docs for Swagger UI documentation.
+    Welcome to my crappy ML app :) Visit /docs for Swagger UI documentation.
     """}
 
 @app.get("/health")
