@@ -48,15 +48,30 @@ except Exception as e:
     logger.error("Error loading TF-IDF vectorizer: %s", e)
     tfidf_vectorizer = TfidfVectorizer()  # Initialize without vocabulary if loading fails
 
-# Load the label encoder classes
+# Load the label encoders
 try:
-    label_encoder_classes = np.load('label_encoder_classes.npy', allow_pickle=True)
-    label_encoder = LabelEncoder()
-    label_encoder.classes_ = label_encoder_classes
-    logger.info("Label encoder classes: %s", label_encoder.classes_)
+    with open('product_encoder.pkl', 'rb') as f:
+        product_encoder = pickle.load(f)
+    logger.info("Product encoder loaded successfully")
 except Exception as e:
-    logger.error("Error loading label encoder classes: %s", e)
-    label_encoder = LabelEncoder()  # Initialize without classes if loading fails
+    logger.error("Error loading product encoder: %s", e)
+    product_encoder = LabelEncoder()  # Initialize without classes if loading fails
+
+try:
+    with open('priority_encoder.pkl', 'rb') as f:
+        priority_encoder = pickle.load(f)
+    logger.info("Priority encoder loaded successfully")
+except Exception as e:
+    logger.error("Error loading priority encoder: %s", e)
+    priority_encoder = LabelEncoder()  # Initialize without classes if loading fails
+
+try:
+    with open('ticket_type_encoder.pkl', 'rb') as f:
+        ticket_type_encoder = pickle.load(f)
+    logger.info("Ticket type encoder loaded successfully")
+except Exception as e:
+    logger.error("Error loading ticket type encoder: %s", e)
+    ticket_type_encoder = LabelEncoder()  # Initialize without classes if loading fails
 
 # Load environment variables for AWS
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
@@ -78,7 +93,7 @@ async def train(request: Request):
         data = response['Body'].read()
 
         logger.info("Loading and preprocessing data")
-        X_train, X_test, y_train, y_test, tfidf_vectorizer, label_encoder = load_and_preprocess_data(BytesIO(data))
+        X_train, X_test, y_train, y_test, tfidf_vectorizer, product_encoder, priority_encoder, ticket_type_encoder = load_and_preprocess_data(BytesIO(data))
 
         logger.info("Training model with new data")
         model, accuracy, report = train_model('best_model.h5', X_train, y_train, X_test, y_test)
@@ -89,6 +104,19 @@ async def train(request: Request):
         return {"message": "Training completed successfully", "accuracy": accuracy, "report": report}
     except Exception as e:
         logger.error("Error in /train endpoint: %s", str(e))
+        return {"error": str(e)}
+
+@app.get("/labels")
+async def get_labels():
+    try:
+        # Return the possible labels for Product Purchased and Ticket Priority
+        return {
+            "product_purchased_labels": product_encoder.classes_.tolist(),
+            "ticket_priority_labels": priority_encoder.classes_.tolist(),
+            "ticket_type_labels": ticket_type_encoder.classes_.tolist()
+        }
+    except Exception as e:
+        logger.error("Error in /labels endpoint: %s", str(e))
         return {"error": str(e)}
 
 class PredictionInput(BaseModel):
@@ -116,13 +144,13 @@ async def predict(input_data: PredictionInput):
 
         # Encode categorical features
         try:
-            df['Product Purchased'] = label_encoder.transform([df['Product Purchased'][0]])[0]
+            df['Product Purchased'] = product_encoder.transform([df['Product Purchased'][0]])[0]
         except ValueError as ve:
             logger.error("Error encoding 'Product Purchased': %s", str(ve))
             return {"error": f"Unseen label in 'Product Purchased': {df['Product Purchased'][0]}"}
 
         try:
-            df['Ticket Priority'] = label_encoder.transform([df['Ticket Priority'][0]])[0]
+            df['Ticket Priority'] = priority_encoder.transform([df['Ticket Priority'][0]])[0]
         except ValueError as ve:
             logger.error("Error encoding 'Ticket Priority': %s", str(ve))
             return {"error": f"Unseen label in 'Ticket Priority': {df['Ticket Priority'][0]}"}
@@ -149,7 +177,7 @@ async def predict(input_data: PredictionInput):
         y_pred_classes = np.argmax(y_pred, axis=1)
 
         # Decode the predictions
-        y_pred_labels = label_encoder.inverse_transform(y_pred_classes)
+        y_pred_labels = ticket_type_encoder.inverse_transform(y_pred_classes)
 
         return {"predictions": y_pred_labels.tolist()}
     except Exception as e:

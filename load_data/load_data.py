@@ -18,10 +18,13 @@ def load_and_preprocess_data(file_path):
 
         logger.info("Preprocessing data")
         # Preprocess the data
-        label_encoder = LabelEncoder()
-        df['Product Purchased'] = label_encoder.fit_transform(df['Product Purchased'])
-        df['Ticket Priority'] = label_encoder.fit_transform(df['Ticket Priority'])
-        df['Ticket Type'] = label_encoder.fit_transform(df['Ticket Type'])
+        product_encoder = LabelEncoder()
+        priority_encoder = LabelEncoder()
+        ticket_type_encoder = LabelEncoder()
+
+        df['Product Purchased'] = product_encoder.fit_transform(df['Product Purchased'])
+        df['Ticket Priority'] = priority_encoder.fit_transform(df['Ticket Priority'])
+        df['Ticket Type'] = ticket_type_encoder.fit_transform(df['Ticket Type'])
 
         # Vectorize text features
         tfidf_vectorizer = TfidfVectorizer()
@@ -30,6 +33,14 @@ def load_and_preprocess_data(file_path):
         # Save the fitted vectorizer
         with open('tfidf_vectorizer.pkl', 'wb') as f:
             pickle.dump(tfidf_vectorizer, f)
+
+        # Save the fitted label encoders
+        with open('product_encoder.pkl', 'wb') as f:
+            pickle.dump(product_encoder, f)
+        with open('priority_encoder.pkl', 'wb') as f:
+            pickle.dump(priority_encoder, f)
+        with open('ticket_type_encoder.pkl', 'wb') as f:
+            pickle.dump(ticket_type_encoder, f)
 
         # Combine features
         X = pd.concat([
@@ -46,7 +57,7 @@ def load_and_preprocess_data(file_path):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         logger.info("Data preprocessing completed successfully")
-        return X_train, X_test, y_train, y_test, tfidf_vectorizer, label_encoder
+        return X_train, X_test, y_train, y_test, tfidf_vectorizer, product_encoder, priority_encoder, ticket_type_encoder
     except Exception as e:
         logger.error("Error in load_and_preprocess_data: %s", str(e))
         raise
