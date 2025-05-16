@@ -9,8 +9,8 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from dotenv import load_dotenv
-from load_data.load_data import load_and_preprocess_data
-from process_data.process_data import evaluate_model
+from data_loading_and_processing.data_loading_and_processing import load_and_preprocess_data
+from evalute_data.evalute_data import evaluate_model
 from model.model import train_model
 import pickle
 import logging
@@ -39,7 +39,7 @@ model = load_model('best_model.h5')
 
 # Load the TF-IDF vectorizer
 try:
-    with open('tfidf_vectorizer.pkl', 'rb') as f:
+    with open('vectorizer/tfidf_vectorizer.pkl', 'rb') as f:
         tfidf_vectorizer = pickle.load(f)
     logger.info("TF-IDF vectorizer loaded successfully")
 except Exception as e:
@@ -48,7 +48,7 @@ except Exception as e:
 
 # Load the label encoders
 try:
-    with open('product_encoder.pkl', 'rb') as f:
+    with open('encoders/product_encoder.pkl', 'rb') as f:
         product_encoder = pickle.load(f)
     logger.info("Product encoder loaded successfully")
 except Exception as e:
@@ -56,7 +56,7 @@ except Exception as e:
     product_encoder = LabelEncoder()  # Initialize without classes if loading fails
 
 try:
-    with open('priority_encoder.pkl', 'rb') as f:
+    with open('encoders/priority_encoder.pkl', 'rb') as f:
         priority_encoder = pickle.load(f)
     logger.info("Priority encoder loaded successfully")
 except Exception as e:
@@ -64,7 +64,7 @@ except Exception as e:
     priority_encoder = LabelEncoder()  # Initialize without classes if loading fails
 
 try:
-    with open('ticket_type_encoder.pkl', 'rb') as f:
+    with open('encoders/ticket_type_encoder.pkl', 'rb') as f:
         ticket_type_encoder = pickle.load(f)
     logger.info("Ticket type encoder loaded successfully")
 except Exception as e:
@@ -94,7 +94,7 @@ async def train(request: Request):
         X_train, X_test, y_train, y_test, tfidf_vectorizer, product_encoder, priority_encoder, ticket_type_encoder = load_and_preprocess_data(BytesIO(data))
 
         logger.info("Training model with new data")
-        model, accuracy, report = train_model('best_model.h5', X_train, y_train, X_test, y_test)
+        model, accuracy, report = train_model('model/best_model.h5', X_train, y_train, X_test, y_test)
 
         # Save the updated model
         model.save('best_model.h5')
