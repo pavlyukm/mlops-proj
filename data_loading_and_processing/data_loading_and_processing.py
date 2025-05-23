@@ -6,18 +6,15 @@ from tensorflow.keras.utils import to_categorical
 import pickle
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def load_and_preprocess_data(file_path):
     try:
         logger.info("Loading dataset")
-        # Load the dataset
         df = pd.read_parquet(file_path)
 
         logger.info("Preprocessing data")
-        # Preprocess the data
         product_encoder = LabelEncoder()
         priority_encoder = LabelEncoder()
         ticket_type_encoder = LabelEncoder()
@@ -26,15 +23,12 @@ def load_and_preprocess_data(file_path):
         df['Ticket Priority'] = priority_encoder.fit_transform(df['Ticket Priority'])
         df['Ticket Type'] = ticket_type_encoder.fit_transform(df['Ticket Type'])
 
-        # Vectorize text features
         tfidf_vectorizer = TfidfVectorizer()
         X_text = tfidf_vectorizer.fit_transform(df['Combined Text'] + " " + df['Ticket Subject'])
 
-        # Save the fitted vectorizer
         with open('tfidf_vectorizer.pkl', 'wb') as f:
             pickle.dump(tfidf_vectorizer, f)
 
-        # Save the fitted label encoders
         with open('product_encoder.pkl', 'wb') as f:
             pickle.dump(product_encoder, f)
         with open('priority_encoder.pkl', 'wb') as f:
@@ -42,7 +36,6 @@ def load_and_preprocess_data(file_path):
         with open('ticket_type_encoder.pkl', 'wb') as f:
             pickle.dump(ticket_type_encoder, f)
 
-        # Combine features
         X = pd.concat([
             df[['Product Purchased', 'Ticket Priority']].reset_index(drop=True),
             pd.DataFrame(X_text.toarray())
@@ -53,7 +46,6 @@ def load_and_preprocess_data(file_path):
         y = df['Ticket Type']
         y = to_categorical(y)
 
-        # Split the data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         logger.info("Data preprocessing completed successfully")

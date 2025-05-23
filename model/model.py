@@ -5,11 +5,9 @@ from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Enable eager execution
 tf.config.run_functions_eagerly(True)
 
 def train_model(model_path, X_train, y_train, X_test, y_test):
@@ -17,15 +15,12 @@ def train_model(model_path, X_train, y_train, X_test, y_test):
         logger.info("Loading existing model")
         model = load_model(model_path)
 
-        # Recompile the model to ensure optimizer compatibility
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
         logger.info("Training model with new data")
-        # Train the model with new data
         model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1)
 
         logger.info("Evaluating model")
-        # Evaluate the model
         y_pred = model.predict(X_test)
         y_pred_classes = np.argmax(y_pred, axis=1)
         y_test_classes = np.argmax(y_test, axis=1)

@@ -15,11 +15,9 @@ from model.model import train_model
 import pickle
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file
 load_dotenv()
 
 app = FastAPI()
@@ -30,30 +28,25 @@ async def root():
     Welcome to my crappy ML app :) Visit /docs for Swagger UI documentation.
     """}
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
 
-# Load the pre-trained model
+# model and vectorizer
 model = load_model('best_model.h5')
-
-# Load the TF-IDF vectorizer
 try:
     with open('vectorizer/tfidf_vectorizer.pkl', 'rb') as f:
         tfidf_vectorizer = pickle.load(f)
     logger.info("TF-IDF vectorizer loaded successfully")
 except Exception as e:
     logger.error("Error loading TF-IDF vectorizer: %s", e)
-    tfidf_vectorizer = TfidfVectorizer()  # Initialize without vocabulary if loading fails
+    tfidf_vectorizer = TfidfVectorizer()
 
-# Load the label encoders
+# label encoders
 try:
     with open('encoders/product_encoder.pkl', 'rb') as f:
         product_encoder = pickle.load(f)
     logger.info("Product encoder loaded successfully")
 except Exception as e:
     logger.error("Error loading product encoder: %s", e)
-    product_encoder = LabelEncoder()  # Initialize without classes if loading fails
+    product_encoder = LabelEncoder()
 
 try:
     with open('encoders/priority_encoder.pkl', 'rb') as f:
@@ -61,7 +54,7 @@ try:
     logger.info("Priority encoder loaded successfully")
 except Exception as e:
     logger.error("Error loading priority encoder: %s", e)
-    priority_encoder = LabelEncoder()  # Initialize without classes if loading fails
+    priority_encoder = LabelEncoder()
 
 try:
     with open('encoders/ticket_type_encoder.pkl', 'rb') as f:
@@ -69,14 +62,13 @@ try:
     logger.info("Ticket type encoder loaded successfully")
 except Exception as e:
     logger.error("Error loading ticket type encoder: %s", e)
-    ticket_type_encoder = LabelEncoder()  # Initialize without classes if loading fails
+    ticket_type_encoder = LabelEncoder()
 
-# Load environment variables for AWS
+# AWS
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 
-# Initialize S3 client
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name=AWS_REGION)
 
 @app.post("/train")
@@ -84,7 +76,8 @@ async def train(request: Request):
     logger.info("Received request at /train endpoint")
     try:
         bucket_name = 'pavliukmmlops'
-        file_key = 'train-00000-of-00001.parquet' # Need to change this for new parquet files
+        file_key = 'train-00000-of-00001.parquet' # if we get more training data need to change the file name or
+        # automate it somehow
 
         logger.info("Downloading file from S3")
         response = s3.get_object(Bucket=bucket_name, Key=file_key)
@@ -96,7 +89,7 @@ async def train(request: Request):
         logger.info("Training model with new data")
         model, accuracy, report = train_model('model/best_model.h5', X_train, y_train, X_test, y_test)
 
-        # Save the updated model
+        # save the updated model
         model.save('best_model.h5')
 
         return {"message": "Training completed successfully", "accuracy": accuracy, "report": report}
@@ -107,7 +100,8 @@ async def train(request: Request):
 @app.get("/labels")
 async def get_labels():
     try:
-        # Return the possible labels for Product Purchased and Ticket Priority
+        # helpful endpoint for building /predict payloads -- shows which products and priorities are avialable (and
+        # prediction classes)
         return {
             "product_purchased_labels": product_encoder.classes_.tolist(),
             "ticket_priority_labels": priority_encoder.classes_.tolist(),
@@ -128,7 +122,6 @@ class PredictionInput(BaseModel):
 async def predict(input_data: PredictionInput):
     try:
         logger.info("Received request at /predict endpoint")
-        # Preprocess the input data
         df = pd.DataFrame([{
             'Customer Email': input_data.customer_email,
             'Product Purchased': input_data.product_purchased,
@@ -140,7 +133,6 @@ async def predict(input_data: PredictionInput):
         logger.info("DataFrame before transformation: %s", df)
         logger.info("Data types: %s", df.dtypes)
 
-        # Encode categorical features
         try:
             df['Product Purchased'] = product_encoder.transform([df['Product Purchased'][0]])[0]
         except ValueError as ve:
@@ -156,10 +148,8 @@ async def predict(input_data: PredictionInput):
         logger.info("DataFrame after encoding: %s", df)
         logger.info("Data types after encoding: %s", df.dtypes)
 
-        # Vectorize text features
         X_text = tfidf_vectorizer.transform(df['Combined Text'] + " " + df['Ticket Subject'])
 
-        # Combine features
         X = pd.concat([
             df[['Product Purchased', 'Ticket Priority']].reset_index(drop=True),
             pd.DataFrame(X_text.toarray())
@@ -170,11 +160,9 @@ async def predict(input_data: PredictionInput):
         logger.info("DataFrame after transformation: %s", X)
         logger.info("Data types after transformation: %s", X.dtypes)
 
-        # Make predictions
         y_pred = model.predict(X)
         y_pred_classes = np.argmax(y_pred, axis=1)
 
-        # Decode the predictions
         y_pred_labels = ticket_type_encoder.inverse_transform(y_pred_classes)
 
         return {"predictions": y_pred_labels.tolist()}
