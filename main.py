@@ -30,7 +30,7 @@ async def root():
 
 
 # model and vectorizer
-model = load_model('best_model.h5')
+model = load_model('model/best_model.h5')
 try:
     with open('vectorizer/tfidf_vectorizer.pkl', 'rb') as f:
         tfidf_vectorizer = pickle.load(f)
