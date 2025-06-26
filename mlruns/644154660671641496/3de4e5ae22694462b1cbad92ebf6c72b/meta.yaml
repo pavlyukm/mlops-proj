@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/3de4e5ae22694462b1cbad92ebf6c72b/artifacts
+end_time: 1750937532601
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 3de4e5ae22694462b1cbad92ebf6c72b
+run_name: painted-shrew-49
+run_uuid: 3de4e5ae22694462b1cbad92ebf6c72b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750937313449
+status: 3
+tags: []
+user_id: root

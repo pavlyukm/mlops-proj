@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/a7c8703340ce40cd962501d1c33b1ed7/artifacts
+end_time: 1750939493593
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: a7c8703340ce40cd962501d1c33b1ed7
+run_name: stylish-crane-143
+run_uuid: a7c8703340ce40cd962501d1c33b1ed7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750939456255
+status: 3
+tags: []
+user_id: root

@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/f9c93164e40b4e10a9a922cced7023ad/artifacts
+end_time: 1750940471505
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: f9c93164e40b4e10a9a922cced7023ad
+run_name: redolent-boar-698
+run_uuid: f9c93164e40b4e10a9a922cced7023ad
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750940371619
+status: 3
+tags: []
+user_id: root

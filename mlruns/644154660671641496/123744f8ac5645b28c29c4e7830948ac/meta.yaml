@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/123744f8ac5645b28c29c4e7830948ac/artifacts
+end_time: 1750939942132
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 123744f8ac5645b28c29c4e7830948ac
+run_name: fortunate-panda-90
+run_uuid: 123744f8ac5645b28c29c4e7830948ac
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750939904251
+status: 3
+tags: []
+user_id: root

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
@@ -23,7 +24,7 @@ def load_and_preprocess_data(file_path):
         df['Ticket Priority'] = priority_encoder.fit_transform(df['Ticket Priority'])
         df['Ticket Type'] = ticket_type_encoder.fit_transform(df['Ticket Type'])
 
-        tfidf_vectorizer = TfidfVectorizer()
+        tfidf_vectorizer = TfidfVectorizer(max_features=5000)
         X_text = tfidf_vectorizer.fit_transform(df['Combined Text'] + " " + df['Ticket Subject'])
 
         with open('tfidf_vectorizer.pkl', 'wb') as f:
@@ -36,19 +37,21 @@ def load_and_preprocess_data(file_path):
         with open('ticket_type_encoder.pkl', 'wb') as f:
             pickle.dump(ticket_type_encoder, f)
 
-        X = pd.concat([
-            df[['Product Purchased', 'Ticket Priority']].reset_index(drop=True),
-            pd.DataFrame(X_text.toarray())
-        ], axis=1)
+        # Convert to dense array
+        X_text_dense = X_text.toarray()
+        
+        # Combine features
+        X = np.hstack([
+            df[['Product Purchased', 'Ticket Priority']].values,
+            X_text_dense
+        ])
 
-        X.columns = X.columns.astype(str)
-
-        y = df['Ticket Type']
+        y = df['Ticket Type'].values
         y = to_categorical(y)
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        logger.info("Data preprocessing completed successfully")
+        logger.info(f"Data preprocessing completed. Train shape: {X_train.shape}, Test shape: {X_test.shape}")
         return X_train, X_test, y_train, y_test, tfidf_vectorizer, product_encoder, priority_encoder, ticket_type_encoder
     except Exception as e:
         logger.error("Error in load_and_preprocess_data: %s", str(e))

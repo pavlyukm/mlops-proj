@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/29022d180f4c4c84b4248d539bfddc55/artifacts
+end_time: 1750937362007
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 29022d180f4c4c84b4248d539bfddc55
+run_name: zealous-ray-520
+run_uuid: 29022d180f4c4c84b4248d539bfddc55
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750937317102
+status: 3
+tags: []
+user_id: root

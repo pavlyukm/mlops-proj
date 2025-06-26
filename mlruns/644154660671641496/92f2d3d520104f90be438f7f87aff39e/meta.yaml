@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/92f2d3d520104f90be438f7f87aff39e/artifacts
+end_time: 1750939456251
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 92f2d3d520104f90be438f7f87aff39e
+run_name: suave-roo-811
+run_uuid: 92f2d3d520104f90be438f7f87aff39e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750939411048
+status: 3
+tags: []
+user_id: root

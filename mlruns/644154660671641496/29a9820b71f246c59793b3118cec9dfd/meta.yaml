@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/29a9820b71f246c59793b3118cec9dfd/artifacts
+end_time: 1750939581900
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 29a9820b71f246c59793b3118cec9dfd
+run_name: efficient-calf-382
+run_uuid: 29a9820b71f246c59793b3118cec9dfd
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750939493598
+status: 3
+tags: []
+user_id: root

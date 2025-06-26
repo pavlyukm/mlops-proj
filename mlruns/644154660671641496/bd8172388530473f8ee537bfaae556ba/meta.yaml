@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/bd8172388530473f8ee537bfaae556ba/artifacts
+end_time: 1750937528725
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: bd8172388530473f8ee537bfaae556ba
+run_name: suave-skunk-41
+run_uuid: bd8172388530473f8ee537bfaae556ba
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750937491340
+status: 3
+tags: []
+user_id: root

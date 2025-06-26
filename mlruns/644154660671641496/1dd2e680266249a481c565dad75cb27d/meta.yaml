@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/1dd2e680266249a481c565dad75cb27d/artifacts
+end_time: 1750936704360
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 1dd2e680266249a481c565dad75cb27d
+run_name: nervous-steed-621
+run_uuid: 1dd2e680266249a481c565dad75cb27d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750936666147
+status: 3
+tags: []
+user_id: root

@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/57fe737a62ee431bada37135158afab0/artifacts
+end_time: 1750937491334
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 57fe737a62ee431bada37135158afab0
+run_name: likeable-perch-809
+run_uuid: 57fe737a62ee431bada37135158afab0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750937401726
+status: 3
+tags: []
+user_id: root

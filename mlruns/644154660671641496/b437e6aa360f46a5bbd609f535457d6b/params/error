@@ -1,0 +1,1 @@
+numpy() is only available when eager execution is enabled.

@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/ba918666b088403fa21e8a3a441b83b5/artifacts
+end_time: 1750936830615
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: ba918666b088403fa21e8a3a441b83b5
+run_name: calm-bat-216
+run_uuid: ba918666b088403fa21e8a3a441b83b5
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750936793452
+status: 3
+tags: []
+user_id: root

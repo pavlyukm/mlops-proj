@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/9a0ccb3ce9e9449e87b5b26ff78a0346/artifacts
+end_time: 1750940831056
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: 9a0ccb3ce9e9449e87b5b26ff78a0346
+run_name: secretive-lynx-588
+run_uuid: 9a0ccb3ce9e9449e87b5b26ff78a0346
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750940718778
+status: 3
+tags: []
+user_id: root

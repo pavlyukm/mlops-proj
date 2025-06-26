@@ -9,16 +9,25 @@ services:
     volumes:
       - mlflow_data:/mlflow
       - ./mlruns:/mlruns
+      - ./scripts:/scripts
     environment:
       - MLFLOW_BACKEND_STORE_URI=file:///mlruns
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=file:///mlflow/artifacts
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL:-https://s3.amazonaws.com}
+      - PYTHONWARNINGS=ignore::UserWarning
     command: >
+      sh -c "pip install boto3 &&
+      python /scripts/init_mlflow.py &&
+      find /mlruns -name '*.yaml' -size 0 -delete &&
+      find /mlruns -type d -empty -delete &&
       mlflow server 
       --backend-store-uri file:///mlruns 
-      --default-artifact-root file:///mlflow/artifacts 
+      --default-artifact-root s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow 
       --host 0.0.0.0 
-      --port 5000 
-      --serve-artifacts
+      --port 5000"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://0.0.0.0:5000/health || exit 1"]
       interval: 30s
@@ -38,7 +47,10 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-pavliukmmlops}
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL:-https://s3.amazonaws.com}
     depends_on:
       - mlflow
     restart: unless-stopped
