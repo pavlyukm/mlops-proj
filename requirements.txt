@@ -7,8 +7,9 @@ keras==3.9.2
 keras-tuner==1.4.7
 numpy==1.26.4
 python-dateutil==2.9.0.post0
-pytz==2025.2
+pytz==2023.3
 requests==2.32.3
 boto3~=1.38.16
 pydantic~=2.11.4
 python-dotenv~=1.1.0
+mlflow==2.8.1

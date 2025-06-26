@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.8.1
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+      - ./mlruns:/mlruns
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=file:///mlruns
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=file:///mlflow/artifacts
+    command: >
+      mlflow server 
+      --backend-store-uri file:///mlruns 
+      --default-artifact-root file:///mlflow/artifacts 
+      --host 0.0.0.0 
+      --port 5000 
+      --serve-artifacts
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://0.0.0.0:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - mlops-network
+
+  app:
+    build: .
+    container_name: mlops-app
+    ports:
+      - "80:80"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+    networks:
+      - mlops-network
+    volumes:
+      - ./model:/app/model
+      - ./encoders:/app/encoders
+      - ./vectorizer:/app/vectorizer
+
+networks:
+  mlops-network:
+    driver: bridge
+
+volumes:
+  mlflow_data:
