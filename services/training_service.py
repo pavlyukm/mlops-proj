@@ -22,7 +22,12 @@ class TrainingService:
         """Execute full training pipeline with hyperparameter tuning"""
         # Ensure MLflow is configured with S3
         from utils.mlflow_utils import setup_mlflow_with_s3
-        setup_mlflow_with_s3()
+        if not setup_mlflow_with_s3():
+            logger.error("Failed to setup MLflow")
+            return {"error": "MLflow setup failed"}
+        
+        # Import mlflow here to ensure it's available
+        import mlflow
         
         with mlflow.start_run():
             try:
