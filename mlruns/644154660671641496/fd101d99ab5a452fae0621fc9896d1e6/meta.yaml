@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/fd101d99ab5a452fae0621fc9896d1e6/artifacts
+end_time: 1751200295269
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: fd101d99ab5a452fae0621fc9896d1e6
+run_name: fortunate-rat-538
+run_uuid: fd101d99ab5a452fae0621fc9896d1e6
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751199315657
+status: 3
+tags: []
+user_id: root

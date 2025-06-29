@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1751200294589
+current_stage: Production
+description: ''
+last_updated_timestamp: 1751200294756
+name: ticket_classification_model
+run_id: fd101d99ab5a452fae0621fc9896d1e6
+run_link: ''
+source: file:///mlflow/artifacts/644154660671641496/fd101d99ab5a452fae0621fc9896d1e6/artifacts/model
+status: READY
+status_message: null
+storage_location: file:///mlflow/artifacts/644154660671641496/fd101d99ab5a452fae0621fc9896d1e6/artifacts/model
+user_id: null
+version: 2

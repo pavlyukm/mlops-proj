@@ -1,0 +1,15 @@
+artifact_uri: file:///mlflow/artifacts/644154660671641496/c3a741d1915645b3960ddedd9a6c2d4d/artifacts
+end_time: 1751197745055
+entry_point_name: ''
+experiment_id: '644154660671641496'
+lifecycle_stage: active
+run_id: c3a741d1915645b3960ddedd9a6c2d4d
+run_name: righteous-robin-753
+run_uuid: c3a741d1915645b3960ddedd9a6c2d4d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751197566035
+status: 3
+tags: []
+user_id: root
