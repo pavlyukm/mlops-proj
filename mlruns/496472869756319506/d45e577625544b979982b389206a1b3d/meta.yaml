@@ -1,0 +1,15 @@
+artifact_uri: s3://pavliukmmlops/mlflow-v2/496472869756319506/d45e577625544b979982b389206a1b3d/artifacts
+end_time: 1751552598054
+entry_point_name: ''
+experiment_id: '496472869756319506'
+lifecycle_stage: active
+run_id: d45e577625544b979982b389206a1b3d
+run_name: zealous-wolf-474
+run_uuid: d45e577625544b979982b389206a1b3d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751550521004
+status: 3
+tags: []
+user_id: root

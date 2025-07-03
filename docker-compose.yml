@@ -8,10 +8,9 @@ services:
       - "5000:5000"
     volumes:
       - ./mlruns:/mlruns
-      - ./scripts:/scripts
     environment:
       - MLFLOW_BACKEND_STORE_URI=file:///mlruns
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow-v2
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
@@ -19,12 +18,10 @@ services:
       - PYTHONWARNINGS=ignore::UserWarning
     command: >
       sh -c "pip install boto3 &&
-      python /scripts/init_mlflow.py &&
-      find /mlruns -name '*.yaml' -size 0 -delete &&
-      find /mlruns -type d -empty -delete &&
+      mkdir -p /mlruns &&
       mlflow server 
       --backend-store-uri file:///mlruns 
-      --artifacts-destination s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow 
+      --artifacts-destination s3://${S3_BUCKET_NAME:-pavliukmmlops}/mlflow-v2
       --host 0.0.0.0 
       --port 5000 
       --serve-artifacts"
@@ -40,9 +37,9 @@ services:
 
   app:
     build: .
-    container_name: mlops-app
+    container_name: ticket-classifier
     ports:
-      - "80:80"
+      - "8000:8000"
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -51,6 +48,7 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-pavliukmmlops}
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL:-https://s3.amazonaws.com}
+      - PYTHONUNBUFFERED=1
     depends_on:
       - mlflow
     restart: unless-stopped
@@ -59,7 +57,6 @@ services:
     volumes:
       - ./model:/app/model
       - ./encoders:/app/encoders
-      - ./vectorizer:/app/vectorizer
 
 networks:
   mlops-network:

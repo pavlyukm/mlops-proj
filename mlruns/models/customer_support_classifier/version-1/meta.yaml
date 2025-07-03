@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1751552597925
+current_stage: None
+description: ''
+last_updated_timestamp: 1751552597925
+name: customer_support_classifier
+run_id: d45e577625544b979982b389206a1b3d
+run_link: ''
+source: s3://pavliukmmlops/mlflow-v2/496472869756319506/d45e577625544b979982b389206a1b3d/artifacts/model
+status: READY
+status_message: null
+storage_location: s3://pavliukmmlops/mlflow-v2/496472869756319506/d45e577625544b979982b389206a1b3d/artifacts/model
+user_id: null
+version: 1

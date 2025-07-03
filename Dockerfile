@@ -1,22 +1,28 @@
-FROM python:3.9
+FROM python:3.10-slim
 
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install boto3
 
-COPY . .
+# Copy application code
+COPY *.py ./
 
 # Create necessary directories
-RUN mkdir -p mlruns encoders vectorizer model scripts
+RUN mkdir -p encoders model
 
-# Copy scripts
-COPY scripts/ scripts/
+# Expose port
+EXPOSE 8000
 
-# Initialize MLflow
-RUN python scripts/init_mlflow.py || echo "MLflow init skipped"
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-EXPOSE 80
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

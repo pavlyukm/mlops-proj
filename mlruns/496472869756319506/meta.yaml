@@ -1,0 +1,6 @@
+artifact_location: s3://pavliukmmlops/mlflow-v2/496472869756319506
+creation_time: 1751550520751
+experiment_id: '496472869756319506'
+last_update_time: 1751550520751
+lifecycle_stage: active
+name: customer_support_classification_v2
