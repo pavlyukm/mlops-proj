@@ -1,0 +1,15 @@
+artifact_uri: s3://pavliukmmlops/mlflow-v2/496472869756319506/bf4f215b93894c15831dbc18baeb0cf7/artifacts
+end_time: 1752062519397
+entry_point_name: ''
+experiment_id: '496472869756319506'
+lifecycle_stage: active
+run_id: bf4f215b93894c15831dbc18baeb0cf7
+run_name: champion_neural_network
+run_uuid: bf4f215b93894c15831dbc18baeb0cf7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752060454206
+status: 3
+tags: []
+user_id: root

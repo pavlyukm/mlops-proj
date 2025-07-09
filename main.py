@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Customer Support Ticket Classifier",
-    description="API for classifying customer support tickets",
+    description="API for classifying customer support tickets with automatic champion/challenger promotion",
     version="2.0.0"
 )
 
@@ -40,11 +40,23 @@ class PredictionRequest(BaseModel):
     tag_7: str = None
     tag_8: str = None
 
+class TrainingRequest(BaseModel):
+    # XGBoost hyperparameters
+    max_depth: int = 6
+    learning_rate: float = 0.1
+    n_estimators: int = 100
+    subsample: float = 0.8
+    colsample_bytree: float = 0.8
+    reg_alpha: float = 0
+    reg_lambda: float = 1
+    min_child_weight: int = 1
+
 class TrainingResponse(BaseModel):
     message: str
     accuracy: float
     run_id: str
     num_classes: int
+    promotion_result: dict
 
 @app.on_event("startup")
 async def startup_event():
@@ -86,10 +98,12 @@ async def root():
     """Root endpoint with API information"""
     return {
         "message": "Customer Support Ticket Classifier API v2.0",
+        "description": "XGBoost-based classifier with automatic champion/challenger promotion",
         "endpoints": {
-            "POST /train": "Train a new model",
-            "POST /predict": "Classify a support ticket",
-            "GET /model-info": "Get model information",
+            "POST /train": "Train a new XGBoost model with custom hyperparameters",
+            "POST /predict": "Classify a ticket using the current champion model",
+            "GET /model-info": "Get information about the current champion model",
+            "GET /model-registry": "Get information about all models in the registry",
             "GET /health": "Health check"
         }
     }
@@ -97,20 +111,23 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    model_loaded = prediction_service is not None and prediction_service.model is not None
+    
     return {
         "status": "healthy",
-        "model_loaded": prediction_service is not None and prediction_service.model is not None
+        "champion_model_loaded": model_loaded,
+        "prediction_service_ready": prediction_service is not None
     }
 
 @app.post("/train", response_model=TrainingResponse)
-async def train_model():
-    """Trigger model training"""
+async def train_model(hyperparams: TrainingRequest = TrainingRequest()):
+    """Train a new XGBoost model with custom hyperparameters"""
     try:
-        logger.info("Starting training process...")
+        logger.info("Starting XGBoost model training...")
         
-        # Import training modules directly
+        # Import training modules
         from data_utils import DataProcessor
-        from model_utils import train_model as train_model_func, promote_model_to_production
+        from model_utils import train_model
         
         # Initialize data processor
         data_processor = DataProcessor()
@@ -126,34 +143,32 @@ async def train_model():
         data_processor.save_preprocessors()
         logger.info("Preprocessors saved to encoders/ folder")
         
-        # Train model
-        logger.info("Training model...")
-        model, accuracy, run_id = train_model_func(X_train, X_test, y_train, y_test, num_classes)
+        # Convert hyperparameters to dict
+        hyperparams_dict = hyperparams.dict()
         
-        # Promote to production if accuracy is good enough
-        if accuracy > 0.7:  # 70% threshold
-            logger.info(f"Model accuracy {accuracy:.4f} is above threshold, promoting to production...")
-            version = promote_model_to_production(run_id)
-            if version:
-                logger.info(f"Model version {version} promoted to production")
-        else:
-            logger.warning(f"Model accuracy {accuracy:.4f} is below threshold (0.7), not promoting to production")
+        # Train model with custom hyperparameters
+        logger.info(f"Training XGBoost model with hyperparameters: {hyperparams_dict}")
+        model, accuracy, run_id, promotion_result = train_model(
+            X_train, X_test, y_train, y_test, num_classes, **hyperparams_dict
+        )
         
-        logger.info("Training pipeline completed successfully!")
+        logger.info("Training completed successfully!")
         
-        # Reload prediction service with new model
-        global prediction_service
-        try:
-            prediction_service = PredictionService()
-            logger.info("Prediction service reloaded successfully")
-        except Exception as e:
-            logger.warning(f"Could not reload prediction service: {e}")
+        # Reload prediction service if model was promoted
+        if promotion_result.get('promoted', False):
+            global prediction_service
+            try:
+                prediction_service = PredictionService()
+                logger.info("Prediction service reloaded with new champion model")
+            except Exception as e:
+                logger.warning(f"Could not reload prediction service: {e}")
         
         return TrainingResponse(
-            message="Training completed successfully. Model reloaded.",
+            message=f"Training completed. Model {'promoted to champion' if promotion_result.get('promoted') else 'added as challenger'}",
             accuracy=float(accuracy),
             run_id=run_id,
-            num_classes=int(num_classes)
+            num_classes=int(num_classes),
+            promotion_result=promotion_result
         )
         
     except Exception as e:
@@ -164,12 +179,12 @@ async def train_model():
 
 @app.post("/predict")
 async def predict_ticket(request: PredictionRequest):
-    """Classify a customer support ticket"""
+    """Classify a customer support ticket using the current champion model"""
     try:
         if prediction_service is None or prediction_service.model is None:
             raise HTTPException(
                 status_code=503, 
-                detail="Model not loaded. Please train a model first using POST /train"
+                detail="Champion model not loaded. Please train a model first using POST /train"
             )
         
         result = prediction_service.predict(
@@ -188,6 +203,7 @@ async def predict_ticket(request: PredictionRequest):
             tag_7=request.tag_7,
             tag_8=request.tag_8
         )
+        
         return result
         
     except Exception as e:
@@ -196,16 +212,32 @@ async def predict_ticket(request: PredictionRequest):
 
 @app.get("/model-info")
 async def get_model_info():
-    """Get information about the current model"""
+    """Get information about the current champion model"""
     try:
         if prediction_service is None:
-            return {"model_loaded": False, "message": "Prediction service not initialized"}
+            return {
+                "champion_model_loaded": False,
+                "message": "Prediction service not initialized"
+            }
         
         return prediction_service.get_model_info()
         
     except Exception as e:
         logger.error(f"Error getting model info: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting model info: {str(e)}")
+
+@app.get("/model-registry")
+async def get_model_registry():
+    """Get information about all models in the MLflow registry"""
+    try:
+        from model_utils import get_model_registry_info
+        
+        registry_info = get_model_registry_info()
+        return registry_info
+        
+    except Exception as e:
+        logger.error(f"Error getting model registry info: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting model registry info: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

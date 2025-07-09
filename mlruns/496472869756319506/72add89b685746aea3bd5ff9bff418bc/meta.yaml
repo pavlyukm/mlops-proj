@@ -1,0 +1,15 @@
+artifact_uri: s3://pavliukmmlops/mlflow-v2/496472869756319506/72add89b685746aea3bd5ff9bff418bc/artifacts
+end_time: 1752067744620
+entry_point_name: ''
+experiment_id: '496472869756319506'
+lifecycle_stage: active
+run_id: 72add89b685746aea3bd5ff9bff418bc
+run_name: judicious-swan-588
+run_uuid: 72add89b685746aea3bd5ff9bff418bc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752064462289
+status: 3
+tags: []
+user_id: root

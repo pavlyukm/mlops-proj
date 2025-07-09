@@ -1,0 +1,15 @@
+artifact_uri: s3://pavliukmmlops/mlflow-v2/496472869756319506/fe5e4a4fd8354abda0b508b7495040e3/artifacts
+end_time: 1752063511396
+entry_point_name: ''
+experiment_id: '496472869756319506'
+lifecycle_stage: active
+run_id: fe5e4a4fd8354abda0b508b7495040e3
+run_name: challenger_xgboost
+run_uuid: fe5e4a4fd8354abda0b508b7495040e3
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752062519547
+status: 3
+tags: []
+user_id: root

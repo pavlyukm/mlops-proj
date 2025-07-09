@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 from data_utils import DataProcessor
-from model_utils import load_production_model
+from model_utils import load_champion_model, get_model_registry_info
 
 logger = logging.getLogger(__name__)
 
@@ -9,21 +9,33 @@ class PredictionService:
     def __init__(self):
         self.data_processor = DataProcessor()
         self.model = None
+        self.model_version = None
         self.load_model_and_preprocessors()
     
     def load_model_and_preprocessors(self):
-        """Load model and preprocessors"""
+        """Load champion model and preprocessors"""
         try:
             # Load preprocessors
             if not self.data_processor.load_preprocessors():
                 raise Exception("Failed to load preprocessors")
             
-            # Load model
-            self.model = load_production_model()
+            # Load champion model
+            self.model = load_champion_model()
             if self.model is None:
-                raise Exception("Failed to load model")
+                raise Exception("Failed to load champion model")
             
-            logger.info("Model and preprocessors loaded successfully")
+            # Get model version info
+            try:
+                registry_info = get_model_registry_info()
+                if registry_info and 'champion' in registry_info:
+                    self.model_version = registry_info['champion']['version']
+                    logger.info(f"Loaded champion model version {self.model_version}")
+                else:
+                    logger.info("Champion model loaded (version unknown)")
+            except Exception as e:
+                logger.warning(f"Could not get model version info: {e}")
+            
+            logger.info("Champion model and preprocessors loaded successfully")
             
         except Exception as e:
             logger.error(f"Error loading model and preprocessors: {e}")
@@ -32,10 +44,10 @@ class PredictionService:
     def predict(self, subject, body, answer=None, ticket_type=None, priority=None, language=None, 
                 tag_1=None, tag_2=None, tag_3=None, tag_4=None, tag_5=None, 
                 tag_6=None, tag_7=None, tag_8=None):
-        """Make prediction for a support ticket"""
+        """Make prediction using the champion model"""
         try:
             if self.model is None:
-                raise Exception("Model not loaded")
+                raise Exception("Champion model not loaded")
             
             # Combine text (including answer if provided)
             text_parts = [subject, body]
@@ -82,11 +94,11 @@ class PredictionService:
             else:
                 X_combined = text_vectorized
             
-            # Convert to dense for prediction
+            # Convert to dense for XGBoost
             X_dense = X_combined.toarray()
             
             # Make prediction
-            prediction_probs = self.model.predict(X_dense)
+            prediction_probs = self.model.predict_proba(X_dense)
             predicted_class_idx = np.argmax(prediction_probs[0])
             confidence = float(np.max(prediction_probs[0]))
             
@@ -96,6 +108,8 @@ class PredictionService:
             return {
                 "predicted_queue": predicted_label,
                 "confidence": confidence,
+                "model_type": "xgboost",
+                "model_version": self.model_version,
                 "probabilities": {
                     label: float(prob) 
                     for label, prob in zip(
@@ -110,15 +124,44 @@ class PredictionService:
             raise
     
     def get_model_info(self):
-        """Get information about the loaded model"""
+        """Get information about the current champion model"""
         try:
             label_info = self.data_processor.get_label_info()
-            return {
-                "model_loaded": self.model is not None,
+            
+            base_info = {
+                "champion_model_loaded": self.model is not None,
+                "model_type": "xgboost",
+                "model_version": self.model_version,
                 "classes": label_info['classes'] if label_info else [],
                 "n_classes": label_info['n_classes'] if label_info else 0,
-                "input_shape": self.model.input_shape if self.model else None
             }
+            
+            # Add XGBoost-specific info
+            if self.model is not None:
+                try:
+                    base_info.update({
+                        "n_estimators": self.model.n_estimators,
+                        "max_depth": self.model.max_depth,
+                        "learning_rate": self.model.learning_rate,
+                        "subsample": self.model.subsample,
+                        "colsample_bytree": self.model.colsample_bytree,
+                        "reg_alpha": self.model.reg_alpha,
+                        "reg_lambda": self.model.reg_lambda,
+                        "min_child_weight": self.model.min_child_weight
+                    })
+                except Exception as e:
+                    logger.warning(f"Could not get XGBoost parameters: {e}")
+            
+            # Add registry info
+            try:
+                registry_info = get_model_registry_info()
+                if registry_info:
+                    base_info["registry_info"] = registry_info
+            except Exception as e:
+                logger.warning(f"Could not get registry info: {e}")
+            
+            return base_info
+            
         except Exception as e:
             logger.error(f"Error getting model info: {e}")
             return {"error": str(e)}
