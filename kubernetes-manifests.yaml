@@ -1,0 +1,224 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: customer-support-ml
+  labels:
+    name: customer-support-ml
+---
+# ConfigMap for environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-config
+  namespace: customer-support-ml
+data:
+  AWS_REGION: "us-east-1"
+  S3_BUCKET_NAME: "pavliukmmlops"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  MLFLOW_S3_ENDPOINT_URL: "https://s3.amazonaws.com"
+  PYTHONUNBUFFERED: "1"
+---
+# Secret for AWS credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-credentials
+  namespace: customer-support-ml
+type: Opaque
+data:
+  # Base64 encode your actual credentials
+  AWS_ACCESS_KEY_ID: <BASE64_ENCODED_ACCESS_KEY>
+  AWS_SECRET_ACCESS_KEY: <BASE64_ENCODED_SECRET_KEY>
+---
+# PersistentVolume for MLflow data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-pvc
+  namespace: customer-support-ml
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# MLflow Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-server
+  namespace: customer-support-ml
+  labels:
+    app: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.8.1
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MLFLOW_BACKEND_STORE_URI
+          value: "file:///mlruns"
+        - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+          valueFrom:
+            configMapKeyRef:
+              name: ml-config
+              key: S3_BUCKET_NAME
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: ml-config
+              key: AWS_REGION
+        volumeMounts:
+        - name: mlflow-storage
+          mountPath: /mlruns
+        command:
+        - sh
+        - -c
+        - |
+          pip install boto3 &&
+          mkdir -p /mlruns &&
+          mlflow server \
+            --backend-store-uri file:///mlruns \
+            --artifacts-destination s3://$(echo $MLFLOW_DEFAULT_ARTIFACT_ROOT)/mlflow-v2 \
+            --host 0.0.0.0 \
+            --port 5000 \
+            --serve-artifacts
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: mlflow-storage
+        persistentVolumeClaim:
+          claimName: mlflow-pvc
+---
+# MLflow Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service
+  namespace: customer-support-ml
+spec:
+  selector:
+    app: mlflow
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+  type: ClusterIP
+---
+# Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-classifier
+  namespace: customer-support-ml
+  labels:
+    app: ticket-classifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-classifier
+  template:
+    metadata:
+      labels:
+        app: ticket-classifier
+    spec:
+      containers:
+      - name: app
+        image: your-registry/ticket-classifier:latest  # Update with your image
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: ml-config
+        - secretRef:
+            name: aws-credentials
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+# Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-classifier-service
+  namespace: customer-support-ml
+spec:
+  selector:
+    app: ticket-classifier
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
+---
+# Ingress for external access (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-services-ingress
+  namespace: customer-support-ml
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: ml-services.local  # Update with your domain
+    http:
+      paths:
+      - path: /mlflow
+        pathType: Prefix
+        backend:
+          service:
+            name: mlflow-service
+            port:
+              number: 5000
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: ticket-classifier-service
+            port:
+              number: 8000

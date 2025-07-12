@@ -1,0 +1,263 @@
+# ConfigMap for ML service configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-config
+  namespace: ml-service
+data:
+  AWS_REGION: "us-east-1"
+  S3_BUCKET_NAME: "pavliukmmlops"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  MLFLOW_S3_ENDPOINT_URL: "https://s3.amazonaws.com"
+  PYTHONUNBUFFERED: "1"
+  # Kubeflow integration
+  KFP_ENDPOINT: "http://ml-pipeline.kubeflow.svc.cluster.local:8888"
+  KUBEFLOW_NAMESPACE: "kubeflow"
+---
+# PersistentVolumeClaim for MLflow
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-pvc
+  namespace: ml-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# MLflow Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-server
+  namespace: ml-service
+  labels:
+    app: mlflow
+    component: tracking-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+        component: tracking-server
+    spec:
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.8.1
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: MLFLOW_BACKEND_STORE_URI
+          value: "file:///mlruns"
+        - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+          value: "s3://pavliukmmlops/mlflow-v2"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: ml-config
+              key: AWS_REGION
+        volumeMounts:
+        - name: mlflow-storage
+          mountPath: /mlruns
+        command:
+        - sh
+        - -c
+        - |
+          pip install boto3 &&
+          mkdir -p /mlruns &&
+          mlflow server \
+            --backend-store-uri file:///mlruns \
+            --artifacts-destination s3://pavliukmmlops/mlflow-v2 \
+            --host 0.0.0.0 \
+            --port 5000 \
+            --serve-artifacts
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: mlflow-storage
+        persistentVolumeClaim:
+          claimName: mlflow-pvc
+---
+# MLflow Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service
+  namespace: ml-service
+  labels:
+    app: mlflow
+    component: tracking-server
+spec:
+  selector:
+    app: mlflow
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+    protocol: TCP
+  type: ClusterIP
+---
+# Ticket Classifier API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-classifier-api
+  namespace: ml-service
+  labels:
+    app: ticket-classifier
+    component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-classifier
+      component: api
+  template:
+    metadata:
+      labels:
+        app: ticket-classifier
+        component: api
+      annotations:
+        # Enable Kubeflow metadata collection
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: api
+        image: ticket-classifier:latest
+        imagePullPolicy: Never  # For Kind cluster
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: ml-config
+        - secretRef:
+            name: aws-credentials
+        env:
+        # Additional environment variables for Kubeflow integration
+        - name: KUBEFLOW_PIPELINES_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: ml-config
+              key: KFP_ENDPOINT
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "6Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/model
+        - name: encoders-storage
+          mountPath: /app/encoders
+      volumes:
+      - name: model-storage
+        emptyDir: {}
+      - name: encoders-storage
+        emptyDir: {}
+---
+# Ticket Classifier Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-classifier-service
+  namespace: ml-service
+  labels:
+    app: ticket-classifier
+    component: api
+spec:
+  selector:
+    app: ticket-classifier
+    component: api
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+---
+# ServiceAccount for Kubeflow integration
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-pipeline-runner
+  namespace: ml-service
+---
+# ClusterRole for accessing Kubeflow Pipelines
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ml-pipeline-runner
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ml-pipeline-runner
+subjects:
+- kind: ServiceAccount
+  name: ml-pipeline-runner
+  namespace: ml-service
+roleRef:
+  kind: ClusterRole
+  name: ml-pipeline-runner
+  apiGroup: rbac.authorization.k8s.io

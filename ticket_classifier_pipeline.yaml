@@ -1,0 +1,118 @@
+# PIPELINE DEFINITION
+# Name: ticket-classifier-training
+# Description: Train customer support ticket classifier
+# Inputs:
+#    learning_rate: float [Default: 0.1]
+#    max_depth: int [Default: 6.0]
+#    n_estimators: int [Default: 50.0]
+components:
+  comp-trigger-training-component:
+    executorLabel: exec-trigger-training-component
+    inputDefinitions:
+      parameters:
+        api_endpoint:
+          defaultValue: http://ticket-classifier-service.ml-service.svc.cluster.local:8000
+          isOptional: true
+          parameterType: STRING
+        learning_rate:
+          defaultValue: 0.1
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        max_depth:
+          defaultValue: 6.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        n_estimators:
+          defaultValue: 100.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-trigger-training-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - trigger_training_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests==2.31.0'\
+          \ 'pandas==2.1.4' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef trigger_training_component(\n    api_endpoint: str = \"http://ticket-classifier-service.ml-service.svc.cluster.local:8000\"\
+          ,\n    max_depth: int = 6,\n    n_estimators: int = 100,\n    learning_rate:\
+          \ float = 0.1\n) -> str:\n    \"\"\"Trigger training via API call\"\"\"\n\
+          \    import requests\n    import json\n    import time\n\n    training_params\
+          \ = {\n        \"max_depth\": max_depth,\n        \"n_estimators\": n_estimators,\n\
+          \        \"learning_rate\": learning_rate\n    }\n\n    print(f\"Triggering\
+          \ training with params: {training_params}\")\n\n    try:\n        response\
+          \ = requests.post(\n            f\"{api_endpoint}/train\",\n           \
+          \ json=training_params,\n            timeout=1800  # 30 minutes\n      \
+          \  )\n\n        if response.status_code == 200:\n            result = response.json()\n\
+          \            print(f\"Training completed successfully!\")\n            print(f\"\
+          Accuracy: {result.get('accuracy', 'Unknown')}\")\n            print(f\"\
+          Run ID: {result.get('run_id', 'Unknown')}\")\n            return f\"Training\
+          \ successful - Accuracy: {result.get('accuracy', 'N/A')}\"\n        else:\n\
+          \            print(f\"Training failed: {response.status_code}\")\n     \
+          \       print(f\"Response: {response.text}\")\n            return f\"Training\
+          \ failed: {response.status_code}\"\n\n    except Exception as e:\n     \
+          \   print(f\"Error calling training API: {e}\")\n        return f\"Error:\
+          \ {str(e)}\"\n\n"
+        image: python:3.10-slim
+pipelineInfo:
+  description: Train customer support ticket classifier
+  name: ticket-classifier-training
+root:
+  dag:
+    tasks:
+      trigger-training-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-trigger-training-component
+        inputs:
+          parameters:
+            learning_rate:
+              componentInputParameter: learning_rate
+            max_depth:
+              componentInputParameter: max_depth
+            n_estimators:
+              componentInputParameter: n_estimators
+        taskInfo:
+          name: trigger-training-component
+  inputDefinitions:
+    parameters:
+      learning_rate:
+        defaultValue: 0.1
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      max_depth:
+        defaultValue: 6.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      n_estimators:
+        defaultValue: 50.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

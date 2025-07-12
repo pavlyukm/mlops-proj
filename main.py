@@ -5,10 +5,7 @@ import os
 from dotenv import load_dotenv
 from predict import PredictionService
 
-# Load environment variables
 load_dotenv()
-
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -67,7 +64,7 @@ async def startup_event():
     import time
     import requests
     
-    mlflow_url = os.getenv('MLFLOW_TRACKING_URI', 'http://mlflow:5000')
+    mlflow_url = os.getenv('MLFLOW_TRACKING_URI', 'http://mlflow-service:5000')
     max_retries = 30
     retry_delay = 2
     
@@ -105,7 +102,8 @@ async def root():
             "GET /model-info": "Get information about the current champion model",
             "GET /model-registry": "Get information about all models in the registry",
             "GET /health": "Health check"
-        }
+        },
+        "kubeflow_integration": "Available - add Kubeflow endpoints after fixing dependencies"
     }
 
 @app.get("/health")
@@ -116,7 +114,9 @@ async def health_check():
     return {
         "status": "healthy",
         "champion_model_loaded": model_loaded,
-        "prediction_service_ready": prediction_service is not None
+        "prediction_service_ready": prediction_service is not None,
+        "mlflow_tracking_uri": os.getenv('MLFLOW_TRACKING_URI'),
+        "message": "Basic API working - Kubeflow integration pending dependency fix"
     }
 
 @app.post("/train", response_model=TrainingResponse)

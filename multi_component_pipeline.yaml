@@ -1,0 +1,480 @@
+# PIPELINE DEFINITION
+# Name: multi-component-ticket-classifier
+# Description: Multi-component pipeline for ticket classifier training
+# Inputs:
+#    accuracy_threshold: float [Default: 0.4]
+#    aws_access_key_id: str [Default: '']
+#    aws_secret_access_key: str [Default: '']
+#    colsample_bytree: float [Default: 0.8]
+#    learning_rate: float [Default: 0.1]
+#    max_depth: int [Default: 6.0]
+#    n_estimators: int [Default: 100.0]
+#    subsample: float [Default: 0.8]
+components:
+  comp-data-loading-component:
+    executorLabel: exec-data-loading-component
+    inputDefinitions:
+      parameters:
+        aws_access_key_id:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
+        aws_region:
+          defaultValue: us-east-1
+          isOptional: true
+          parameterType: STRING
+        aws_secret_access_key:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
+        dataset_key:
+          defaultValue: dataset-tickets-multi-lang-4-20k.csv
+          isOptional: true
+          parameterType: STRING
+        s3_bucket:
+          defaultValue: pavliukmmlops
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRUCT
+  comp-model-deployment-component:
+    executorLabel: exec-model-deployment-component
+    inputDefinitions:
+      parameters:
+        accuracy:
+          parameterType: NUMBER_DOUBLE
+        accuracy_threshold:
+          defaultValue: 0.4
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        api_endpoint:
+          defaultValue: http://ticket-classifier-service.ml-service.svc.cluster.local:8000
+          isOptional: true
+          parameterType: STRING
+        model_size:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-preprocessing-component:
+    executorLabel: exec-preprocessing-component
+    inputDefinitions:
+      artifacts:
+        dataset_input:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        preprocessors:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        processed_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRUCT
+  comp-training-component:
+    executorLabel: exec-training-component
+    inputDefinitions:
+      artifacts:
+        processed_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        colsample_bytree:
+          defaultValue: 0.8
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        learning_rate:
+          defaultValue: 0.1
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        max_depth:
+          defaultValue: 6.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        n_estimators:
+          defaultValue: 100.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        num_classes:
+          defaultValue: 10.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        subsample:
+          defaultValue: 0.8
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        trained_model:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        training_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRUCT
+deploymentSpec:
+  executors:
+    exec-data-loading-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - data_loading_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.1.4'\
+          \ 'boto3==1.34.0' 'scikit-learn==1.3.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef data_loading_component(\n    dataset_output: Output[Dataset],\n\
+          \    s3_bucket: str = \"pavliukmmlops\",\n    dataset_key: str = \"dataset-tickets-multi-lang-4-20k.csv\"\
+          ,\n    aws_access_key_id: str = \"\",\n    aws_secret_access_key: str =\
+          \ \"\",\n    aws_region: str = \"us-east-1\"\n) -> dict:\n    \"\"\"Load\
+          \ dataset from S3\"\"\"\n    import pandas as pd\n    import boto3\n   \
+          \ from io import StringIO\n    import pickle\n\n    # Initialize S3 client\n\
+          \    s3_client = boto3.client(\n        's3',\n        aws_access_key_id=aws_access_key_id,\n\
+          \        aws_secret_access_key=aws_secret_access_key,\n        region_name=aws_region\n\
+          \    )\n\n    # Load data\n    response = s3_client.get_object(Bucket=s3_bucket,\
+          \ Key=dataset_key)\n    csv_content = response['Body'].read().decode('utf-8')\n\
+          \    df = pd.read_csv(StringIO(csv_content))\n\n    print(f\"Loaded dataset:\
+          \ {df.shape}\")\n    print(f\"Columns: {df.columns.tolist()}\")\n\n    #\
+          \ Save dataset\n    with open(dataset_output.path, 'wb') as f:\n       \
+          \ pickle.dump(df, f)\n\n    return {\n        \"num_samples\": len(df),\n\
+          \        \"num_features\": len(df.columns)\n    }\n\n"
+        image: python:3.10-slim
+        resources:
+          memoryRequest: 2.147483648
+          resourceMemoryRequest: 2Gi
+    exec-model-deployment-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - model_deployment_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests==2.31.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef model_deployment_component(\n    accuracy: float,\n    model_size:\
+          \ str,\n    accuracy_threshold: float = 0.4,\n    api_endpoint: str = \"\
+          http://ticket-classifier-service.ml-service.svc.cluster.local:8000\"\n)\
+          \ -> str:\n    \"\"\"Deploy model if it meets criteria\"\"\"\n    import\
+          \ requests\n\n    print(f\"Model evaluation:\")\n    print(f\"  Accuracy:\
+          \ {accuracy:.4f}\")\n    print(f\"  Threshold: {accuracy_threshold}\")\n\
+          \    print(f\"  Model size: {model_size}\")\n\n    if accuracy >= accuracy_threshold:\n\
+          \        print(\"\u2705 Model meets deployment criteria!\")\n\n        #\
+          \ You could trigger model deployment here\n        # For now, just check\
+          \ API health\n        try:\n            response = requests.get(f\"{api_endpoint}/health\"\
+          , timeout=10)\n            if response.status_code == 200:\n           \
+          \     return f\"Model approved for deployment! Accuracy: {accuracy:.4f}\"\
+          \n            else:\n                return f\"Model approved but API not\
+          \ available. Accuracy: {accuracy:.4f}\"\n        except:\n            return\
+          \ f\"Model approved but cannot reach API. Accuracy: {accuracy:.4f}\"\n \
+          \   else:\n        return f\"Model rejected. Accuracy {accuracy:.4f} < threshold\
+          \ {accuracy_threshold}\"\n\n"
+        image: python:3.10-slim
+        resources:
+          memoryRequest: 1.073741824
+          resourceMemoryRequest: 1Gi
+    exec-preprocessing-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocessing_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.1.4'\
+          \ 'scikit-learn==1.3.2' 'scipy==1.11.4' 'joblib==1.3.2' && \"$0\" \"$@\"\
+          \n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocessing_component(\n    dataset_input: Input[Dataset],\n\
+          \    processed_data: Output[Dataset],\n    preprocessors: Output[Artifact]\n\
+          ) -> dict:\n    \"\"\"Preprocess the data\"\"\"\n    import pandas as pd\n\
+          \    import pickle\n    import joblib\n    from sklearn.model_selection\
+          \ import train_test_split\n    from sklearn.preprocessing import LabelEncoder\n\
+          \    from sklearn.feature_extraction.text import TfidfVectorizer\n    from\
+          \ scipy import sparse\n    import numpy as np\n\n    # Load dataset\n  \
+          \  with open(dataset_input.path, 'rb') as f:\n        df = pickle.load(f)\n\
+          \n    print(f\"Processing dataset: {df.shape}\")\n\n    # Data preprocessing\
+          \ logic\n    text_columns = ['subject', 'body', 'answer']\n    categorical_columns\
+          \ = ['type', 'priority', 'language', 'tag_1', 'tag_2', 'tag_3']\n    target_column\
+          \ = 'queue'\n\n    # Clean data\n    df = df.dropna(subset=[target_column])\n\
+          \n    # Process text\n    text_data = []\n    for col in text_columns:\n\
+          \        if col in df.columns:\n            df[col] = df[col].fillna('').astype(str)\n\
+          \            text_data.append(df[col].values)\n\n    # Combine text\n  \
+          \  combined_text = []\n    for i in range(len(df)):\n        row_text =\
+          \ ' '.join([text_col[i] for text_col in text_data])\n        combined_text.append(row_text)\n\
+          \n    # Initialize preprocessors\n    label_encoder = LabelEncoder()\n \
+          \   tfidf_vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')\n\
+          \    categorical_encoders = {}\n\n    # Process categorical features\n \
+          \   categorical_features = []\n    for col in categorical_columns:\n   \
+          \     if col in df.columns:\n            df[col] = df[col].fillna('unknown').astype(str)\n\
+          \            encoder = LabelEncoder()\n            encoded_values = encoder.fit_transform(df[col])\n\
+          \            categorical_features.append(encoded_values)\n            categorical_encoders[col]\
+          \ = encoder\n\n    # Vectorize text\n    X_text = tfidf_vectorizer.fit_transform(combined_text)\n\
+          \n    # Combine features\n    if categorical_features:\n        categorical_matrix\
+          \ = np.column_stack(categorical_features)\n        categorical_sparse =\
+          \ sparse.csr_matrix(categorical_matrix)\n        X_combined = sparse.hstack([X_text,\
+          \ categorical_sparse])\n    else:\n        X_combined = X_text\n\n    #\
+          \ Encode target\n    y_encoded = label_encoder.fit_transform(df[target_column])\n\
+          \n    # Split data\n    X_train, X_test, y_train, y_test = train_test_split(\n\
+          \        X_combined, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded\n\
+          \    )\n\n    # Save processed data\n    data_dict = {\n        'X_train':\
+          \ X_train,\n        'X_test': X_test,\n        'y_train': y_train,\n   \
+          \     'y_test': y_test\n    }\n\n    with open(processed_data.path, 'wb')\
+          \ as f:\n        pickle.dump(data_dict, f)\n\n    # Save preprocessors\n\
+          \    preprocessor_dict = {\n        'label_encoder': label_encoder,\n  \
+          \      'tfidf_vectorizer': tfidf_vectorizer,\n        'categorical_encoders':\
+          \ categorical_encoders\n    }\n\n    joblib.dump(preprocessor_dict, preprocessors.path)\n\
+          \n    print(f\"Preprocessing complete:\")\n    print(f\"  Train samples:\
+          \ {len(X_train.toarray())}\")\n    print(f\"  Test samples: {len(X_test.toarray())}\"\
+          )\n    print(f\"  Classes: {len(label_encoder.classes_)}\")\n\n    return\
+          \ {\n        \"train_samples\": len(X_train.toarray()),\n        \"test_samples\"\
+          : len(X_test.toarray()),\n        \"num_classes\": len(label_encoder.classes_)\n\
+          \    }\n\n"
+        image: python:3.10-slim
+        resources:
+          memoryRequest: 4.294967296
+          resourceMemoryRequest: 4Gi
+    exec-training-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - training_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'xgboost==2.0.3'\
+          \ 'scikit-learn==1.3.2' 'joblib==1.3.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef training_component(\n    processed_data: Input[Dataset],\n  \
+          \  trained_model: Output[Artifact],\n    training_metrics: Output[Metrics],\n\
+          \    num_classes: int = 10,\n    max_depth: int = 6,\n    learning_rate:\
+          \ float = 0.1,\n    n_estimators: int = 100,\n    subsample: float = 0.8,\n\
+          \    colsample_bytree: float = 0.8\n) -> dict:\n    \"\"\"Train XGBoost\
+          \ model\"\"\"\n    import pickle\n    import joblib\n    import xgboost\
+          \ as xgb\n    from sklearn.metrics import accuracy_score\n    import json\n\
+          \n    # Load processed data\n    with open(processed_data.path, 'rb') as\
+          \ f:\n        data_dict = pickle.load(f)\n\n    X_train = data_dict['X_train'].toarray()\n\
+          \    X_test = data_dict['X_test'].toarray()\n    y_train = data_dict['y_train']\n\
+          \    y_test = data_dict['y_test']\n\n    print(f\"Training with:\")\n  \
+          \  print(f\"  max_depth: {max_depth}\")\n    print(f\"  learning_rate: {learning_rate}\"\
+          )\n    print(f\"  n_estimators: {n_estimators}\")\n\n    # Create and train\
+          \ model\n    model = xgb.XGBClassifier(\n        objective='multi:softprob',\n\
+          \        num_class=num_classes,\n        max_depth=max_depth,\n        learning_rate=learning_rate,\n\
+          \        n_estimators=n_estimators,\n        subsample=subsample,\n    \
+          \    colsample_bytree=colsample_bytree,\n        random_state=42\n    )\n\
+          \n    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)\n\
+          \n    # Evaluate\n    y_pred = model.predict(X_test)\n    accuracy = accuracy_score(y_test,\
+          \ y_pred)\n\n    print(f\"Training completed! Accuracy: {accuracy:.4f}\"\
+          )\n\n    # Save model\n    joblib.dump(model, trained_model.path)\n\n  \
+          \  # Save metrics\n    metrics = {\n        \"accuracy\": accuracy,\n  \
+          \      \"n_estimators\": n_estimators,\n        \"max_depth\": max_depth,\n\
+          \        \"learning_rate\": learning_rate\n    }\n\n    with open(training_metrics.path,\
+          \ 'w') as f:\n        json.dump(metrics, f)\n\n    return {\n        \"\
+          accuracy\": accuracy,\n        \"model_size\": f\"{n_estimators} trees\"\
+          \n    }\n\n"
+        image: python:3.10-slim
+        resources:
+          memoryRequest: 6.442450944
+          resourceMemoryRequest: 6Gi
+pipelineInfo:
+  description: Multi-component pipeline for ticket classifier training
+  name: multi-component-ticket-classifier
+root:
+  dag:
+    tasks:
+      data-loading-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-data-loading-component
+        inputs:
+          parameters:
+            aws_access_key_id:
+              componentInputParameter: aws_access_key_id
+            aws_secret_access_key:
+              componentInputParameter: aws_secret_access_key
+        taskInfo:
+          name: data-loading-component
+      model-deployment-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-model-deployment-component
+        inputs:
+          parameters:
+            accuracy:
+              runtimeValue:
+                constant: 0.5
+            accuracy_threshold:
+              componentInputParameter: accuracy_threshold
+            model_size:
+              runtimeValue:
+                constant: '{{$.inputs.parameters[''pipelinechannel--n_estimators'']}}
+                  trees'
+            pipelinechannel--n_estimators:
+              componentInputParameter: n_estimators
+        taskInfo:
+          name: model-deployment-component
+      preprocessing-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocessing-component
+        dependentTasks:
+        - data-loading-component
+        inputs:
+          artifacts:
+            dataset_input:
+              taskOutputArtifact:
+                outputArtifactKey: dataset_output
+                producerTask: data-loading-component
+        taskInfo:
+          name: preprocessing-component
+      training-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-training-component
+        dependentTasks:
+        - preprocessing-component
+        inputs:
+          artifacts:
+            processed_data:
+              taskOutputArtifact:
+                outputArtifactKey: processed_data
+                producerTask: preprocessing-component
+          parameters:
+            colsample_bytree:
+              componentInputParameter: colsample_bytree
+            learning_rate:
+              componentInputParameter: learning_rate
+            max_depth:
+              componentInputParameter: max_depth
+            n_estimators:
+              componentInputParameter: n_estimators
+            subsample:
+              componentInputParameter: subsample
+        taskInfo:
+          name: training-component
+  inputDefinitions:
+    parameters:
+      accuracy_threshold:
+        defaultValue: 0.4
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      aws_access_key_id:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      aws_secret_access_key:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      colsample_bytree:
+        defaultValue: 0.8
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      learning_rate:
+        defaultValue: 0.1
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      max_depth:
+        defaultValue: 6.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      n_estimators:
+        defaultValue: 100.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      subsample:
+        defaultValue: 0.8
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0
