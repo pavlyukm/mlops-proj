@@ -1,11 +1,13 @@
-# Customer Support Ticket Classifier v2.0
+# Customer Support Ticket Classifier App
 
 MLOps platform for customer support ticket classification with Kubeflow integration, MLflow experiment tracking, and XGBoost-based models.
+
+Dataset: https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets
 
 ## Quick Start
 
 ### Prerequisites
-- Docker Desktop (8GB+ memory recommended)
+- Docker Desktop (8GB+ memory allocation recommended when using Kubeflow deployment)
 - Kind (Kubernetes in Docker)
 - AWS credentials configured
 - Dataset uploaded to S3 as `dataset-tickets-multi-lang-4-20k.csv`
@@ -20,7 +22,7 @@ AWS_REGION=us-east-1
 S3_BUCKET_NAME=pavliukmmlops
 ```
 
-## Docker Compose Deployment (Standalone)
+## Docker Compose Deployment (No Kubeflow required)
 
 ### Run the Application
 
@@ -30,7 +32,7 @@ docker-compose ps
 docker-compose logs -f app
 ```
 
-## Kubeflow Deployment (Full MLOps Platform)
+## Kubeflow Deployment
 
 ### Prerequisites for Kubeflow Setup
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/): `brew install kind`
@@ -52,7 +54,6 @@ kubectl apply -k "github.com/kubeflow/pipelines/manifests/kustomize/env/platform
 ```bash
 kubectl create namespace ml-service
 
-# AWS credentials secret
 export $(cat .env | xargs)
 kubectl create secret generic aws-credentials \
     --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
@@ -67,23 +68,12 @@ kubectl apply -f k8s-deployment.yaml
 
 ### 3. Setup Port Forwarding
 
-Create `start_services.sh`:
-```bash
-#!/bin/bash
+```
 pkill -f "kubectl port-forward" 2>/dev/null
 kubectl port-forward svc/ticket-classifier-service -n ml-service 8001:8000 &
 kubectl port-forward svc/mlflow-service -n ml-service 5001:5000 &
 kubectl port-forward svc/ml-pipeline-ui -n kubeflow 8082:80 &
 kubectl port-forward svc/ml-pipeline -n kubeflow 8888:8888 &
-echo "All services started!"
-echo "API: http://localhost:8001"
-echo "MLflow: http://localhost:5001"  
-echo "Kubeflow: http://localhost:8082"
-```
-
-```bash
-chmod +x start_services.sh
-./start_services.sh
 ```
 
 ### 4. Access Services
@@ -286,18 +276,8 @@ curl -X POST http://localhost:8001/predict \
 # Check cluster resources
 kubectl describe node kubeflow-control-plane | grep -A 5 "Allocated resources"
 
-# Increase Docker Desktop memory (Recommended: 12GB+)
+# Increase Docker Desktop memory (Recommended: 8GB+)
 # Docker Desktop → Settings → Resources → Memory
-```
-
-### Port Forward Issues
-```bash
-# Restart all services
-./start_services.sh
-
-# Check service health
-curl http://localhost:8001/health
-curl http://localhost:5001/health
 ```
 
 ### Pipeline Stuck/Failed
@@ -324,25 +304,3 @@ kubectl scale deployment --all --replicas=0 -n kubeflow
 kind delete cluster --name kubeflow
 ```
 ---
-
-## Quick Commands Reference
-
-```bash
-# Start everything
-./start_services.sh
-
-# Train model
-curl -X POST http://localhost:8001/train -d '{"n_estimators": 100}'
-
-# Health checks  
-curl http://localhost:8001/health
-curl http://localhost:5001/health
-
-# Access UIs
-open http://localhost:8001  # API docs
-open http://localhost:5001  # MLflow  
-open http://localhost:8082  # Kubeflow
-
-# Shutdown
-kind delete cluster --name kubeflow
-```
